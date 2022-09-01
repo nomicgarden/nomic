@@ -4,13 +4,13 @@ Welcome to the garden!
 
 ## Developing
 
-Once you've cloned this repository and installed dependencies with `pnpm install`, start a development server:
+Once you've cloned this repository and installed dependencies with `yarn install`, start a development server:
 
 ```bash
-pnpm run dev
+yarn run dev
 
 # or start the server and open the app in a new browser tab
-pnpm run dev -- --open
+yarn run dev -- --open
 ```
 
 ## Building
@@ -18,7 +18,7 @@ pnpm run dev -- --open
 To create a production version of your app:
 
 ```bash
-pnpm run build
+yarn run build
 ```
 
-You can preview the production build with `npm run preview`.
+You can preview the production build with `yarn run preview`.
