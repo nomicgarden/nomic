@@ -1,7 +1,7 @@
 <main>
   <h1>TREASURY</h1>
   <hr />
-  <div>The treasury is currently empty. Don't hesitate to reach out to Cosmo if you'd like to support Nomic!</div>
+  <div>The treasury is currently empty :(</div>
 </main>
 
 <style>
