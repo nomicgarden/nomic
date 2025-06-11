@@ -1,4 +1,5 @@
-import { JWT_SECRET } from '$env/static/private';
+import * as env from '$env/dynamic/private';
+const JWT_SECRET = env.JWT_SECRET;
 import jwt from 'jsonwebtoken';
 
 /** @type {import('@sveltejs/kit').Handle} */
