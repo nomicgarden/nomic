@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '$env/static/private';
+import * as env from '$env/dynamic/private';
+const JWT_SECRET = env.JWT_SECRET;
 
 // Check if JWT_SECRET is loaded
 if (!JWT_SECRET) {
