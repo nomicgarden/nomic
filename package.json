@@ -42,9 +42,9 @@
   "type": "module",
   "dependencies": {
     "@fontsource/fira-mono": "5.2.6",
-    "bcrypt": "6.0.0",
     "cookie": "1.0.2",
-    "jsonwebtoken": "9.0.2",
-    "web-vitals": "5.0.2"
+    "web-vitals": "5.0.2",
+    "zxcvbn": "^4.4.2",
+    "bip39": "^3.1.0"
   }
 }

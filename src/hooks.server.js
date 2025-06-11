@@ -1,50 +1,6 @@
-import * as env from '$env/dynamic/private';
-const JWT_SECRET = env.JWT_SECRET;
-import jwt from 'jsonwebtoken';
-import { error } from '@sveltejs/kit';
-
 /** @type {import('@sveltejs/kit').Handle} */
 export const handle = async ({ event, resolve }) => {
-  const token = event.cookies.get('session');
   event.locals.user = null; // Initialize user as null
-
-  if (token) {
-    try {
-      // Check if JWT_SECRET is loaded. It should be, but good practice to ensure.
-      if (!JWT_SECRET) {
-        console.error(
-          'CRITICAL: JWT_SECRET is not available. This application cannot function securely without it.'
-        );
-        // Throw a 500 error to prevent further request processing and inform the user.
-        throw error(500, 'Server configuration error: JWT_SECRET is missing. Please set this environment variable in your deployment environment.');
-      } else {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        if (typeof decoded === 'object' && decoded !== null && 'id' in decoded) {
-          // Add any other necessary user properties from the token to event.locals.user
-          event.locals.user = {
-            id: decoded.id,
-            username: decoded.username,
-            email: decoded.email
-            // Add other fields from payload if they exist e.g. roles, permissions
-          };
-        } else {
-          console.warn('JWT verification returned unexpected payload:', decoded);
-          // Clear cookie if payload is not as expected
-          event.cookies.delete('session', { path: '/' });
-        }
-      }
-    } catch (err) {
-      // Common errors: TokenExpiredError, JsonWebTokenError (e.g. invalid signature)
-      if (err instanceof Error) {
-        console.warn(`Token verification failed: ${err.name} - ${err.message}`);
-      } else {
-        console.warn(`Token verification failed: Unknown error occurred.`);
-      }
-      event.locals.user = null;
-      // Clear the invalid/expired cookie
-      event.cookies.delete('session', { path: '/' });
-    }
-  }
 
   // Add security headers
   const response = await resolve(event);
