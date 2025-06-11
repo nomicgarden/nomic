@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   db,
-  initDb, // Assuming initDb can be called to reset schema on the in-memory DB
+  reinitializeDbForTest,
   createUser,
   createProposal,
   getProposalById,
@@ -15,12 +15,14 @@ async function resetDatabase() {
   // For better-sqlite3 in-memory, re-running initDb effectively clears and recreates schema
   // For file-based, you'd delete and recreate the file.
   // The modified database.js uses a single in-memory instance, so we re-initialize its schema.
-  db.exec(`
-    DROP TABLE IF EXISTS proposals;
-    DROP TABLE IF EXISTS users;
-  `);
-  initDb(db); // Pass the actual db instance to initDb
-  console.log('Test Database schema re-initialized.');
+  // db.exec(`
+  //   DROP TABLE IF EXISTS proposals;
+  //   DROP TABLE IF EXISTS users;
+  // `);
+  // initDb(db); // Pass the actual db instance to initDb
+  // console.log('Test Database schema re-initialized.');
+  // The reinitializeDbForTest function handles its own logging and table dropping/creation.
+  reinitializeDbForTest();
 }
 
 let testUser;
@@ -99,7 +101,7 @@ async function testUpdateStatus() {
   const created = createProposal(proposalData);
   assert(created && created.id, 'Failed to create proposal for status update test.');
 
-  const newStatus = 'open_for_voting';
+  const newStatus = 'proposed'; // Changed from 'open_for_voting' to a valid status
   const updateResult = updateProposalStatus(created.id, newStatus);
   assert(updateResult && updateResult.changes > 0, 'updateProposalStatus should indicate changes.');
 
@@ -111,6 +113,42 @@ async function testUpdateStatus() {
     `Proposal status should be updated to ${newStatus}.`
   );
   console.log('testUpdateStatus: PASS');
+}
+
+async function testUpdateProposalStatusValidation() {
+  console.log('Running: testUpdateProposalStatusValidation');
+  await resetDatabase();
+  await setupUser();
+
+  const proposalData = {
+    title: 'Status Validation Test',
+    description: 'Desc for status validation',
+    author_id: testUser.id,
+    status: 'draft'
+  };
+  const created = createProposal(proposalData);
+  assert(created && created.id, 'Failed to create proposal for status validation test.');
+
+  const invalidStatus = 'invalid_status_value';
+  try {
+    updateProposalStatus(created.id, invalidStatus);
+    assert.fail('Should have thrown an error for invalid status.');
+  } catch (error) {
+    assert(
+      error.message.startsWith('Invalid status:'),
+      `Expected invalid status error, but got: ${error.message}`
+    );
+    console.log('Caught expected error for invalid status.');
+  }
+
+  const validStatuses = ['draft', 'proposed', 'active', 'rejected', 'implemented'];
+  for (const status of validStatuses) {
+    const updateResult = updateProposalStatus(created.id, status);
+    assert(updateResult && updateResult.changes >= 0, `updateProposalStatus to ${status} should succeed or report no change.`); // changes can be 0 if status is same
+    const fetched = getProposalById(created.id);
+    assert.strictEqual(fetched.status, status, `Proposal status should be updated to ${status}.`);
+  }
+  console.log('testUpdateProposalStatusValidation: PASS');
 }
 
 async function testUpdateDetails() {
@@ -205,6 +243,7 @@ async function runAllTests() {
   try {
     await testCreateAndGetProposal();
     await testUpdateStatus();
+    await testUpdateProposalStatusValidation();
     await testUpdateDetails();
     await testGetProposals();
     console.log('\nAll proposal database tests PASSED!');
