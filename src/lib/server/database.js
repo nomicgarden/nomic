@@ -50,8 +50,20 @@ function initDb(databaseInstance) {
         manifold_market_url TEXT, -- Optional link to a Manifold market for voting/prediction
         FOREIGN KEY (author_id) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        proposal_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        vote_value TEXT NOT NULL, -- Consider CHECK(vote_value IN ('yes', 'no', 'abstain'))
+        voted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        rationale TEXT,
+        FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE (proposal_id, user_id) -- Ensures a user can only vote once per proposal
+    );
   `);
-  console.log('Database initialized and `users` and `proposals` tables ensured.');
+  console.log('Database initialized and `users`, `proposals`, and `votes` tables ensured.');
 }
 
 // Call initDb with the instance to ensure schema is set up
@@ -366,5 +378,162 @@ export function updateProposalDetails(id, data) {
         throw new Error('Title and description cannot be empty.');
     }
     throw new Error(`Database query failed while updating proposal ID ${id}.`);
+  }
+}
+
+// CONCEPTUAL NOTE ON CLOSING VOTING & DETERMINING PROPOSAL OUTCOME:
+// 1. Trigger for Closing Votes:
+//    - Could be a scheduled job that checks proposal end dates/durations.
+//    - Could be a manual action by an administrator via a separate admin interface.
+//
+// 2. Determining Outcome:
+//    - After voting closes (e.g., status becomes 'voting_closed' via updateProposalStatus),
+//      fetch all votes using getVotesByProposalId(proposalId).
+//    - Calculate final tally (e.g., yesVotes vs. noVotes).
+//    - Apply predefined logic (e.g., simple majority, specific threshold).
+//
+// 3. Updating Proposal Status:
+//    - Based on the outcome, call updateProposalStatus(proposalId, 'accepted') or
+//      updateProposalStatus(proposalId, 'rejected').
+//    - Further statuses like 'implemented' could follow based on off-chain actions.
+//
+// This process is currently not automated within the application and would
+// require additional components (admin panel, scheduled tasks) for full automation.
+
+// CRUD Functions for Votes
+
+/**
+ * Records a vote for a proposal.
+ * @param {object} data - Vote data.
+ * @param {number} data.proposal_id - ID of the proposal being voted on.
+ * @param {number} data.user_id - ID of the user voting.
+ * @param {string} data.vote_value - The user's vote (e.g., 'yes', 'no', 'abstain').
+ * @param {string} [data.rationale] - Optional rationale for the vote.
+ * @returns {object} Placeholder for the created vote, e.g., { id: newVoteId, ...data }.
+ */
+export function createVote(data) {
+  const { proposal_id, user_id, vote_value, rationale = null } = data;
+
+  if (typeof proposal_id === 'undefined' || typeof user_id === 'undefined' || !vote_value) {
+    throw new Error('Proposal ID, User ID, and Vote Value are required to create a vote.');
+  }
+  // Add validation for vote_value if specific values are expected e.g. ['yes', 'no', 'abstain']
+  // if (!['yes', 'no', 'abstain'].includes(vote_value)) {
+  //   throw new Error(`Invalid vote_value: ${vote_value}`);
+  // }
+
+  try {
+    const stmt = db.prepare(
+      'INSERT INTO votes (proposal_id, user_id, vote_value, rationale) VALUES (?, ?, ?, ?)'
+    );
+    const info = stmt.run(Number(proposal_id), Number(user_id), vote_value, rationale);
+    const newVote = db.prepare('SELECT voted_at FROM votes WHERE id = ?').get(info.lastInsertRowid);
+    return {
+      id: info.lastInsertRowid,
+      proposal_id: Number(proposal_id),
+      user_id: Number(user_id),
+      vote_value,
+      rationale,
+      voted_at: newVote.voted_at
+    };
+  } catch (error) {
+    console.error('Error creating vote:', error.message);
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      throw new Error('User has already voted on this proposal.');
+    }
+    if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+      // Could be proposal_id or user_id is invalid
+      throw new Error('Invalid proposal_id or user_id.');
+    }
+    if (error.code === 'SQLITE_CONSTRAINT_NOTNULL') {
+      throw new Error('A required field for the vote was missing.');
+    }
+    throw new Error('Failed to create vote due to a database error.');
+  }
+}
+
+/**
+ * Retrieves all votes for a specific proposal, including voter information.
+ * @param {number} proposal_id - The ID of the proposal.
+ * @returns {Array<object>} An array of vote objects, each including voter's username.
+ */
+export function getVotesByProposalId(proposal_id) {
+  try {
+    const stmt = db.prepare(`
+      SELECT
+        v.id,
+        v.proposal_id,
+        v.user_id,
+        v.vote_value,
+        v.voted_at,
+        v.rationale,
+        u.username AS voter_username
+      FROM votes v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.proposal_id = ?
+      ORDER BY v.voted_at DESC
+    `);
+    const votes = stmt.all(Number(proposal_id));
+    return votes;
+  } catch (error) {
+    console.error(`Error fetching votes for proposal ID ${proposal_id}:`, error.message);
+    throw new Error('Database query failed while fetching votes for proposal.');
+  }
+}
+
+/**
+ * Retrieves a specific user's vote for a given proposal.
+ * @param {number} proposal_id - The ID of the proposal.
+ * @param {number} user_id - The ID of the user.
+ * @returns {object | null} The vote object if found, otherwise null.
+ */
+export function getUserVoteForProposal(proposal_id, user_id) {
+  try {
+    const stmt = db.prepare('SELECT * FROM votes WHERE proposal_id = ? AND user_id = ?');
+    const vote = stmt.get(Number(proposal_id), Number(user_id));
+    return vote || null;
+  } catch (error) {
+    console.error(`Error fetching user vote for proposal ${proposal_id}, user ${user_id}:`, error.message);
+    throw new Error('Database query failed while fetching user vote.');
+  }
+}
+
+/**
+ * Updates an existing vote.
+ * @param {number} vote_id - The ID of the vote to update.
+ * @param {object} data - Data to update, e.g., { vote_value, rationale }.
+ * @returns {object} Object indicating the number of changes, e.g., { changes: number }.
+ */
+export function updateVote(vote_id, data) {
+  const { vote_value, rationale } = data;
+
+  if (!vote_value) { // vote_value is required for an update
+    throw new Error('Vote value is required to update a vote.');
+  }
+  // Add validation for vote_value if specific values are expected
+  // if (!['yes', 'no', 'abstain'].includes(vote_value)) {
+  //   throw new Error(`Invalid vote_value: ${vote_value}`);
+  // }
+
+  try {
+    // Update voted_at to reflect the time of the last change to the vote
+    const stmt = db.prepare(
+      'UPDATE votes SET vote_value = ?, rationale = ?, voted_at = CURRENT_TIMESTAMP WHERE id = ?'
+    );
+    const info = stmt.run(vote_value, rationale === undefined ? null : rationale, Number(vote_id));
+
+    if (info.changes === 0) {
+      const existsStmt = db.prepare('SELECT id FROM votes WHERE id = ?');
+      if (!existsStmt.get(Number(vote_id))) {
+          throw new Error(`Vote with ID ${vote_id} not found.`);
+      }
+    }
+    return { changes: info.changes };
+  } catch (error) {
+    console.error(`Error updating vote ID ${vote_id}:`, error.message);
+    if (error.code === 'SQLITE_CONSTRAINT_NOTNULL') {
+      throw new Error('A required field for the vote update was missing or invalid.');
+    }
+    throw new Error(`Database query failed while updating vote ID ${vote_id}.`);
   }
 }

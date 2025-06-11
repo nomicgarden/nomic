@@ -144,11 +144,15 @@
     color: #fff;
     text-transform: capitalize;
   }
-  .status-draft { background-color: #6c757d; }
-  .status-proposed { background-color: #007bff; }
-  .status-active { background-color: #28a745; }
-  .status-rejected { background-color: #dc3545; }
-  .status-implemented { background-color: #17a2b8; }
+  .status-draft { background-color: #6c757d; } /* Gray */
+  .status-pending_review { background-color: #ffc107; color: #212529;} /* Yellow, dark text */
+  .status-open_for_voting { background-color: #007bff; } /* Blue */
+  .status-voting_closed { background-color: #fd7e14; } /* Orange */
+  .status-accepted { background-color: #28a745; } /* Green */
+  .status-rejected { background-color: #dc3545; } /* Red */
+  .status-implemented { background-color: #17a2b8; } /* Teal */
+  .status-archived { background-color: #f8f9fa; color: #6c757d; border: 1px solid #6c757d;} /* Light gray, dark text */
+
 
   .proposal-description-excerpt {
     font-size: 1rem;
