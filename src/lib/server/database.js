@@ -105,14 +105,17 @@ export function createUser(username, email, passwordHash) {
     // Return the newly created user's ID and username.
     // The email is also included for completeness, though often just ID/username is sufficient.
     return { id: info.lastInsertRowid, username, email };
-  } catch (error) {
+  } catch (err) {
     // Log the error for server-side debugging
-    console.error('Error creating user:', error.message);
+    console.error('Error creating user:', err.message, `(Code: ${err.code})`);
     // Check for unique constraint violation
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      throw new Error('Username or email already exists.');
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      const customError = new Error('User already exists (username or email).');
+      customError.code = 'USER_ALREADY_EXISTS_DB'; // Custom code
+      throw customError;
     }
-    throw new Error('Failed to create user due to a database error.');
+    // Re-throw other errors with more context if possible, or just re-throw
+    throw new Error(`Failed to create user due to a database error. Original: ${err.message}`);
   }
 }
 
