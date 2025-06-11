@@ -14,7 +14,6 @@
 
 <script>
   import "../app.css";
-  export let user; // This prop is populated by the load function's return value
 </script>
 
 <svelte:head>

@@ -27,7 +27,6 @@ export const actions = {
     // manifold_market_url is optional, can be added later if needed in the form
     // const manifold_market_url = formData.get('manifold_market_url')?.toString()?.trim();
 
-
     const errors = {};
     if (!title) {
       errors.title = 'Title is required.';

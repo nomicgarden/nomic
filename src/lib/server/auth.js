@@ -3,7 +3,9 @@ import { JWT_SECRET } from '$env/static/private';
 
 // Check if JWT_SECRET is loaded
 if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET is not defined. Please check your .env file and SvelteKit configuration.');
+  throw new Error(
+    'JWT_SECRET is not defined. Please check your .env file and SvelteKit configuration.'
+  );
 }
 
 /**

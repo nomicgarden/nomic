@@ -15,6 +15,7 @@ Manifold Markets is a popular example of a prediction market platform where user
 
 Nomic Garden is an experimental organization that operates as a game of Nomic. It uniquely combines the rule-making dynamics of Nomic with the forecasting power of prediction markets.
 In Nomic Garden, the rules of the organization itself are subject to change, proposed and decided upon by its members. The decision-making process incorporates elements of:
+
 - **Futarchy**: Prediction markets are used to forecast the likely outcomes of proposed rule changes. The results of these markets heavily influence whether a proposal is adopted, prioritizing changes that are predicted to be beneficial.
 - **Democracy**: Members also have direct voting rights on proposals, ensuring a balance between market-driven insights and collective will.
 

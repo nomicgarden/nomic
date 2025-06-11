@@ -79,7 +79,7 @@ if (isTestEnvironment) {
 // This is particularly useful for in-memory databases to get a fresh start.
 export function reinitializeDbForTest() {
   if (!isTestEnvironment) {
-    throw new Error("reinitializeDbForTest is only allowed in test environment.");
+    throw new Error('reinitializeDbForTest is only allowed in test environment.');
   }
   // Close existing connection if open, though for in-memory, creating a new instance is often enough.
   // dbInstance.close(); // This might invalidate the exported 'db'. Careful management needed.
@@ -90,17 +90,14 @@ export function reinitializeDbForTest() {
   // So, for tests, it's often better to create a NEW in-memory DB for each test suite or test.
   // For this script, we'll rely on the initial single in-memory DB for all tests in one run.
   // A more robust test setup might involve passing a new DB instance to functions.
-  console.log("Re-running schema for in-memory test database.");
+  console.log('Re-running schema for in-memory test database.');
   initDb(dbInstance); // Re-run schema on the same in-memory DB instance
 }
-
 
 // User interaction functions
 export function createUser(username, email, passwordHash) {
   try {
-    const stmt = db.prepare(
-      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
-    );
+    const stmt = db.prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)');
     const info = stmt.run(username, email, passwordHash);
     // Return the newly created user's ID and username.
     // The email is also included for completeness, though often just ID/username is sufficient.
@@ -121,7 +118,9 @@ export function createUser(username, email, passwordHash) {
 
 export function findUserByUsername(username) {
   try {
-    const stmt = db.prepare('SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE username = ?');
+    const stmt = db.prepare(
+      'SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE username = ?'
+    );
     const user = stmt.get(username);
     return user || null;
   } catch (error) {
@@ -132,7 +131,9 @@ export function findUserByUsername(username) {
 
 export function findUserByEmail(email) {
   try {
-    const stmt = db.prepare('SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE email = ?');
+    const stmt = db.prepare(
+      'SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE email = ?'
+    );
     const user = stmt.get(email);
     return user || null;
   } catch (error) {
@@ -155,7 +156,14 @@ export function findUserByEmail(email) {
  * @returns {object} Placeholder for the created proposal, e.g., { id: newId, ...data }.
  */
 export function createProposal(data) {
-  const { title, description, author_id, proposed_rule_text = null, status = 'draft', manifold_market_url = null } = data;
+  const {
+    title,
+    description,
+    author_id,
+    proposed_rule_text = null,
+    status = 'draft',
+    manifold_market_url = null
+  } = data;
 
   if (!title || !description || typeof author_id === 'undefined') {
     // Basic check for required fields at the database function level,
@@ -167,10 +175,19 @@ export function createProposal(data) {
     const stmt = db.prepare(
       'INSERT INTO proposals (title, description, author_id, proposed_rule_text, status, manifold_market_url) VALUES (?, ?, ?, ?, ?, ?)'
     );
-    const info = stmt.run(title, description, author_id, proposed_rule_text, status, manifold_market_url);
+    const info = stmt.run(
+      title,
+      description,
+      author_id,
+      proposed_rule_text,
+      status,
+      manifold_market_url
+    );
 
     // Fetch the created_at timestamp which is set by DEFAULT CURRENT_TIMESTAMP
-    const newProposal = db.prepare('SELECT created_at FROM proposals WHERE id = ?').get(info.lastInsertRowid);
+    const newProposal = db
+      .prepare('SELECT created_at FROM proposals WHERE id = ?')
+      .get(info.lastInsertRowid);
 
     return {
       id: info.lastInsertRowid,
@@ -190,7 +207,7 @@ export function createProposal(data) {
     }
     // Check for NOT NULL constraint (though handled by the initial check, good for defense)
     if (error.code === 'SQLITE_CONSTRAINT_NOTNULL') {
-      console.error("A NOT NULL constraint was violated. Data provided:", data);
+      console.error('A NOT NULL constraint was violated. Data provided:', data);
       throw new Error('A required field was missing for the proposal.');
     }
     throw new Error('Failed to create proposal due to a database error.');
@@ -348,7 +365,10 @@ export function updateProposalDetails(id, data) {
   for (const key in data) {
     if (validFields.includes(key) && typeof data[key] !== 'undefined') {
       // Allow empty string for optional fields, but use null if explicitly passed or for consistency
-      fieldsToUpdate[key] = data[key] === '' && (key === 'proposed_rule_text' || key === 'manifold_market_url') ? null : data[key];
+      fieldsToUpdate[key] =
+        data[key] === '' && (key === 'proposed_rule_text' || key === 'manifold_market_url')
+          ? null
+          : data[key];
     }
   }
 
@@ -358,7 +378,9 @@ export function updateProposalDetails(id, data) {
     return { changes: 0, message: 'No valid or changed fields provided for update.' };
   }
 
-  const setClauses = Object.keys(fieldsToUpdate).map(field => `${field} = ?`).join(', ');
+  const setClauses = Object.keys(fieldsToUpdate)
+    .map((field) => `${field} = ?`)
+    .join(', ');
   const params = [...Object.values(fieldsToUpdate), Number(id)];
 
   try {
@@ -370,15 +392,18 @@ export function updateProposalDetails(id, data) {
       // Check if proposal exists to differentiate.
       const existsStmt = db.prepare('SELECT id FROM proposals WHERE id = ?');
       if (!existsStmt.get(Number(id))) {
-          throw new Error(`Proposal with ID ${id} not found.`);
+        throw new Error(`Proposal with ID ${id} not found.`);
       }
     }
     return { changes: info.changes };
   } catch (error) {
     console.error(`Error updating proposal details for ID ${id}:`, error.message);
     // Check for specific constraints if necessary, e.g. NOT NULL if a required field was set to null
-    if (error.code === 'SQLITE_CONSTRAINT_NOTNULL' && (fieldsToUpdate.title === null || fieldsToUpdate.description === null)) {
-        throw new Error('Title and description cannot be empty.');
+    if (
+      error.code === 'SQLITE_CONSTRAINT_NOTNULL' &&
+      (fieldsToUpdate.title === null || fieldsToUpdate.description === null)
+    ) {
+      throw new Error('Title and description cannot be empty.');
     }
     throw new Error(`Database query failed while updating proposal ID ${id}.`);
   }
@@ -496,7 +521,10 @@ export function getUserVoteForProposal(proposal_id, user_id) {
     const vote = stmt.get(Number(proposal_id), Number(user_id));
     return vote || null;
   } catch (error) {
-    console.error(`Error fetching user vote for proposal ${proposal_id}, user ${user_id}:`, error.message);
+    console.error(
+      `Error fetching user vote for proposal ${proposal_id}, user ${user_id}:`,
+      error.message
+    );
     throw new Error('Database query failed while fetching user vote.');
   }
 }
@@ -510,7 +538,8 @@ export function getUserVoteForProposal(proposal_id, user_id) {
 export function updateVote(vote_id, data) {
   const { vote_value, rationale } = data;
 
-  if (!vote_value) { // vote_value is required for an update
+  if (!vote_value) {
+    // vote_value is required for an update
     throw new Error('Vote value is required to update a vote.');
   }
   // Add validation for vote_value if specific values are expected
@@ -528,7 +557,7 @@ export function updateVote(vote_id, data) {
     if (info.changes === 0) {
       const existsStmt = db.prepare('SELECT id FROM votes WHERE id = ?');
       if (!existsStmt.get(Number(vote_id))) {
-          throw new Error(`Vote with ID ${vote_id} not found.`);
+        throw new Error(`Vote with ID ${vote_id} not found.`);
       }
     }
     return { changes: info.changes };

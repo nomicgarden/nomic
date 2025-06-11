@@ -1,5 +1,11 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { getProposalById, getUserVoteForProposal, createVote, updateVote, getVotesByProposalId } from '$lib/server/database.js';
+import {
+  getProposalById,
+  getUserVoteForProposal,
+  createVote,
+  updateVote,
+  getVotesByProposalId
+} from '$lib/server/database.js';
 
 /** @type {import('@sveltejs/kit').Load} */
 export async function load({ params, locals }) {
@@ -22,7 +28,7 @@ export async function load({ params, locals }) {
     let yesVotes = 0;
     let noVotes = 0;
 
-    allVotes.forEach(vote => {
+    allVotes.forEach((vote) => {
       if (vote.vote_value === 'yes') {
         yesVotes++;
       } else if (vote.vote_value === 'no') {
@@ -66,13 +72,13 @@ export const actions = {
     const rationale = formData.get('rationale')?.toString() || null;
 
     // Validate vote_value
-    if (!vote_value || !['yes', 'no'].includes(vote_value)) { // Assuming 'yes' and 'no' are the only valid values for now
+    if (!vote_value || !['yes', 'no'].includes(vote_value)) {
+      // Assuming 'yes' and 'no' are the only valid values for now
       return fail(400, { voteError: 'Invalid vote value submitted.', vote_value, rationale });
     }
 
     const proposalIdStr = params.id; // This is a string
     const proposalId = Number(proposalIdStr);
-
 
     try {
       const proposal = getProposalById(proposalId);
@@ -86,7 +92,9 @@ export const actions = {
       // to 'voting_closed', then to 'accepted' or 'rejected') is managed externally or by admin actions
       // for this phase of development (see conceptual notes in database.js).
       if (proposal.status !== 'open_for_voting') {
-        return fail(403, { voteError: `Voting is not currently open for this proposal. Status is: ${proposal.status}` });
+        return fail(403, {
+          voteError: `Voting is not currently open for this proposal. Status is: ${proposal.status}`
+        });
       }
 
       const userId = currentUser.id;
@@ -111,15 +119,21 @@ export const actions = {
       // Successfully cast or updated vote, redirect to refresh the page.
       // SvelteKit's redirect will be caught by the browser and cause a GET request.
       throw redirect(303, `/proposals/${proposalIdStr}?vote_success=true`);
-
     } catch (dbError) {
       console.error('Vote casting database error:', dbError);
       // Check for UNIQUE constraint error specifically if it's a createVote that should have been an update
       // This scenario implies a race condition or an unexpected state if existingVote was null but DB has a vote.
       if (dbError.code === 'SQLITE_CONSTRAINT_UNIQUE' && !existingVote) {
-         return fail(409, { voteError: 'You have already voted on this proposal. If you meant to change your vote, please try again.', vote_value, rationale});
+        return fail(409, {
+          voteError:
+            'You have already voted on this proposal. If you meant to change your vote, please try again.',
+          vote_value,
+          rationale
+        });
       }
-      return fail(500, { voteError: dbError.message || 'Failed to cast vote due to a server error. Please try again.' });
+      return fail(500, {
+        voteError: dbError.message || 'Failed to cast vote due to a server error. Please try again.'
+      });
     }
   }
 };

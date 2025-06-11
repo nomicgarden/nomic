@@ -50,7 +50,9 @@ export const actions = {
     }
 
     if (currentProposal.status !== 'draft') {
-      return fail(403, { error: 'This proposal cannot be edited as it is no longer in draft status.' });
+      return fail(403, {
+        error: 'This proposal cannot be edited as it is no longer in draft status.'
+      });
     }
 
     const formData = await request.formData();
@@ -71,13 +73,12 @@ export const actions = {
     }
     // Basic URL validation for manifold_market_url if provided
     if (manifold_market_url) {
-        try {
-            new URL(manifold_market_url);
-        } catch (_) {
-            errors.manifold_market_url = 'Invalid URL format for Manifold Market.';
-        }
+      try {
+        new URL(manifold_market_url);
+      } catch (_) {
+        errors.manifold_market_url = 'Invalid URL format for Manifold Market.';
+      }
     }
-
 
     if (Object.keys(errors).length > 0) {
       return fail(400, { errors, values: formValues });
@@ -88,7 +89,7 @@ export const actions = {
         title,
         description,
         proposed_rule_text: proposed_rule_text || null, // Ensure null if empty string was submitted and DB expects null
-        manifold_market_url: manifold_market_url || null,
+        manifold_market_url: manifold_market_url || null
       };
 
       const result = updateProposalDetails(proposalId, updateData);
@@ -96,13 +97,16 @@ export const actions = {
       if (result.changes > 0) {
         throw redirect(303, `/proposals/${proposalId}`);
       } else if (result.changes === 0 && !result.message) {
-         // No changes were made, but no explicit error. Could be same data submitted.
-         // Redirecting back is often fine, or return a specific message.
-         // For simplicity, we'll consider this a "soft" success.
-         throw redirect(303, `/proposals/${proposalId}?notice=no_changes`);
+        // No changes were made, but no explicit error. Could be same data submitted.
+        // Redirecting back is often fine, or return a specific message.
+        // For simplicity, we'll consider this a "soft" success.
+        throw redirect(303, `/proposals/${proposalId}?notice=no_changes`);
       } else {
         // Handle cases like "No valid or changed fields provided for update." from DB function
-        return fail(400, { error: result.message || 'No changes were applied.', values: formValues });
+        return fail(400, {
+          error: result.message || 'No changes were applied.',
+          values: formValues
+        });
       }
     } catch (e) {
       console.error('Error updating proposal:', e);
