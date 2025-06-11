@@ -91,7 +91,13 @@ export function reinitializeDbForTest() {
   // So, for tests, it's often better to create a NEW in-memory DB for each test suite or test.
   // For this script, we'll rely on the initial single in-memory DB for all tests in one run.
   // A more robust test setup might involve passing a new DB instance to functions.
-  console.log('Re-running schema for in-memory test database.');
+  console.log('Re-initializing database for test: Dropping existing tables and re-running schema.');
+  // Drop tables in reverse order of dependency
+  dbInstance.exec(`
+    DROP TABLE IF EXISTS votes;
+    DROP TABLE IF EXISTS proposals;
+    DROP TABLE IF EXISTS users;
+  `);
   initDb(dbInstance); // Re-run schema on the same in-memory DB instance
 }
 
@@ -364,15 +370,14 @@ export function getProposals(options = {}) {
 // Intended for use by admin functionalities or automated system processes
 // to move proposals through their lifecycle (e.g., 'draft' -> 'open_for_voting').
 // Future enhancements could include more robust status transition validation.
+
+const ALLOWED_STATUSES = ['draft', 'proposed', 'active', 'rejected', 'implemented'];
+
 export function updateProposalStatus(id, status) {
   // Basic validation for status - should not be empty.
   // A more robust validation would check against a predefined list of allowed statuses.
-  // e.g., const ALLOWED_STATUSES = ['draft', 'pending_review', ...];
-  // if (!ALLOWED_STATUSES.includes(status)) {
-  //   throw new Error(`Invalid status value: ${status}`);
-  // }
-  if (typeof status !== 'string' || status.trim() === '') {
-    throw new Error('Status must be a non-empty string.');
+  if (!ALLOWED_STATUSES.includes(status)) {
+    throw new Error(`Invalid status: "${status}". Allowed statuses are: ${ALLOWED_STATUSES.join(', ')}`);
   }
 
   try {
@@ -478,6 +483,8 @@ export function updateProposalDetails(id, data) {
 
 // CRUD Functions for Votes
 
+const ALLOWED_VOTE_VALUES = ['yes', 'no', 'abstain'];
+
 /**
  * Records a vote for a proposal.
  * @param {object} data - Vote data.
@@ -494,9 +501,9 @@ export function createVote(data) {
     throw new Error('Proposal ID, User ID, and Vote Value are required to create a vote.');
   }
   // Add validation for vote_value if specific values are expected e.g. ['yes', 'no', 'abstain']
-  // if (!['yes', 'no', 'abstain'].includes(vote_value)) {
-  //   throw new Error(`Invalid vote_value: ${vote_value}`);
-  // }
+  if (!ALLOWED_VOTE_VALUES.includes(vote_value)) {
+    throw new Error(`Invalid vote_value: "${vote_value}". Allowed values are: ${ALLOWED_VOTE_VALUES.join(', ')}`);
+  }
 
   try {
     const stmt = db.prepare(
@@ -591,9 +598,9 @@ export function updateVote(vote_id, data) {
     throw new Error('Vote value is required to update a vote.');
   }
   // Add validation for vote_value if specific values are expected
-  // if (!['yes', 'no', 'abstain'].includes(vote_value)) {
-  //   throw new Error(`Invalid vote_value: ${vote_value}`);
-  // }
+  if (!ALLOWED_VOTE_VALUES.includes(vote_value)) {
+    throw new Error(`Invalid vote_value: "${vote_value}". Allowed values are: ${ALLOWED_VOTE_VALUES.join(', ')}`);
+  }
 
   try {
     // Update voted_at to reflect the time of the last change to the vote

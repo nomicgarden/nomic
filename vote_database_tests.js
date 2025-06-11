@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   db,
-  initDb,
+  reinitializeDbForTest,
   createUser,
   findUserByUsername, // Needed for setupTestUser if user might exist
   createProposal,
@@ -17,13 +17,15 @@ let testUser1, testUser2, testProposal1;
 
 async function resetDatabase() {
   // Ensure all relevant tables are dropped. Order matters due to foreign keys.
-  db.exec(`
-    DROP TABLE IF EXISTS votes;
-    DROP TABLE IF EXISTS proposals;
-    DROP TABLE IF EXISTS users;
-  `);
-  initDb(db); // Pass the actual db instance
-  console.log('Test Database schema re-initialized (Users, Proposals, Votes).');
+  // db.exec(`
+  //   DROP TABLE IF EXISTS votes;
+  //   DROP TABLE IF EXISTS proposals;
+  //   DROP TABLE IF EXISTS users;
+  // `);
+  // initDb(db); // Pass the actual db instance
+  // console.log('Test Database schema re-initialized (Users, Proposals, Votes).');
+  // The reinitializeDbForTest function handles its own logging and table dropping/creation.
+  reinitializeDbForTest();
 }
 
 async function setupTestUser(usernameSuffix = '', emailSuffix = '') {
@@ -111,6 +113,63 @@ async function testCreateAndGetUserVote() {
   console.log('testCreateAndGetUserVote: PASS');
 }
 
+async function testCreateVoteValidation() {
+  console.log('Running: testCreateVoteValidation');
+  await resetDatabase();
+  testUser1 = await setupTestUser('CreateVoteValidationUser');
+  testProposal1 = await setupTestProposal(testUser1.id, 'CreateVoteValidationProp');
+
+  const invalidVoteValue = 'maybe_invalid';
+  try {
+    createVote({
+      proposal_id: testProposal1.id,
+      user_id: testUser1.id,
+      vote_value: invalidVoteValue,
+      rationale: 'Trying an invalid value.'
+    });
+    assert.fail('Should have thrown an error for invalid vote_value in createVote.');
+  } catch (error) {
+    assert(
+      error.message.startsWith('Invalid vote_value:'),
+      `Expected invalid vote_value error, but got: ${error.message}`
+    );
+    console.log('Caught expected error for invalid vote_value in createVote.');
+  }
+
+  const validVoteValues = ['yes', 'no', 'abstain'];
+  // Need to ensure each vote is unique, either by different user or different proposal if testing multiple valid votes by same user.
+  // For this test, let's use different users for simplicity to avoid UNIQUE constraint on (proposal_id, user_id).
+  // Ensure unique email suffixes for each user.
+  let userYes = await setupTestUser('ValidVoteUserYes', 'Yes');
+  const voteYes = createVote({
+    proposal_id: testProposal1.id,
+    user_id: userYes.id,
+    vote_value: 'yes',
+    rationale: 'Valid yes vote.'
+  });
+  assert(voteYes && voteYes.id, 'Creating a "yes" vote should succeed.');
+
+  let userNo = await setupTestUser('ValidVoteUserNo', 'No');
+  const voteNo = createVote({
+    proposal_id: testProposal1.id,
+    user_id: userNo.id,
+    vote_value: 'no',
+    rationale: 'Valid no vote.'
+  });
+  assert(voteNo && voteNo.id, 'Creating a "no" vote should succeed.');
+
+  let userAbstain = await setupTestUser('ValidVoteUserAbstain', 'Abstain');
+  const voteAbstain = createVote({
+    proposal_id: testProposal1.id,
+    user_id: userAbstain.id,
+    vote_value: 'abstain',
+    rationale: 'Valid abstain vote.'
+  });
+  assert(voteAbstain && voteAbstain.id, 'Creating an "abstain" vote should succeed.');
+
+  console.log('testCreateVoteValidation: PASS');
+}
+
 async function testUpdateVote() {
   console.log('Running: testUpdateVote');
   await resetDatabase();
@@ -128,7 +187,8 @@ async function testUpdateVote() {
   const initialVotedAt = createdVote.voted_at;
 
   // Wait a bit to ensure timestamp changes - in a real scenario this might need more robust handling or specific DB time functions
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  // Increased timeout to > 1s to ensure CURRENT_TIMESTAMP has a chance to change at second-granularity.
+  await new Promise((resolve) => setTimeout(resolve, 1100));
 
   const updatedVoteData = { vote_value: 'no', rationale: 'Changed my mind.' };
   const updateResult = updateVote(createdVote.id, updatedVoteData);
@@ -154,11 +214,47 @@ async function testUpdateVote() {
   console.log('testUpdateVote: PASS');
 }
 
+async function testUpdateVoteValidation() {
+  console.log('Running: testUpdateVoteValidation');
+  await resetDatabase();
+  testUser1 = await setupTestUser('UpdateVoteValidationUser');
+  testProposal1 = await setupTestProposal(testUser1.id, 'UpdateVoteValidationProp');
+
+  const initialVote = createVote({
+    proposal_id: testProposal1.id,
+    user_id: testUser1.id,
+    vote_value: 'yes',
+    rationale: 'Initial vote for update validation.'
+  });
+  assert(initialVote && initialVote.id, 'Failed to create initial vote for update validation test.');
+
+  const invalidVoteValue = 'maybe_again_invalid';
+  try {
+    updateVote(initialVote.id, { vote_value: invalidVoteValue, rationale: 'Trying to update to invalid.' });
+    assert.fail('Should have thrown an error for invalid vote_value in updateVote.');
+  } catch (error) {
+    assert(
+      error.message.startsWith('Invalid vote_value:'),
+      `Expected invalid vote_value error for update, but got: ${error.message}`
+    );
+    console.log('Caught expected error for invalid vote_value in updateVote.');
+  }
+
+  const validVoteValues = ['yes', 'no', 'abstain'];
+  for (const value of validVoteValues) {
+    const updateResult = updateVote(initialVote.id, { vote_value: value, rationale: `Updating to ${value}` });
+    assert(updateResult && updateResult.changes >= 0, `updateVote to ${value} should succeed or report no change.`);
+    const fetched = getUserVoteForProposal(testProposal1.id, testUser1.id);
+    assert.strictEqual(fetched.vote_value, value, `Vote value should be updated to ${value}.`);
+  }
+  console.log('testUpdateVoteValidation: PASS');
+}
+
 async function testGetVotesForProposal() {
   console.log('Running: testGetVotesForProposal');
   await resetDatabase();
-  testUser1 = await setupTestUser('MultiVoteUser1');
-  testUser2 = await setupTestUser('MultiVoteUser2');
+  testUser1 = await setupTestUser('MultiVoteUser1', 'Multi1');
+  testUser2 = await setupTestUser('MultiVoteUser2', 'Multi2');
   testProposal1 = await setupTestProposal(testUser1.id, 'MultiVoteProp');
 
   createVote({
@@ -210,7 +306,9 @@ async function runAllTests() {
   try {
     console.log('Starting Vote Database Tests...');
     await testCreateAndGetUserVote();
+    await testCreateVoteValidation();
     await testUpdateVote();
+    await testUpdateVoteValidation();
     await testGetVotesForProposal();
     console.log('\nAll vote database tests PASSED!');
   } catch (error) {
