@@ -1,6 +1,7 @@
 import * as env from '$env/dynamic/private';
 const JWT_SECRET = env.JWT_SECRET;
 import jwt from 'jsonwebtoken';
+import { error } from '@sveltejs/kit';
 
 /** @type {import('@sveltejs/kit').Handle} */
 export const handle = async ({ event, resolve }) => {
@@ -12,9 +13,10 @@ export const handle = async ({ event, resolve }) => {
       // Check if JWT_SECRET is loaded. It should be, but good practice to ensure.
       if (!JWT_SECRET) {
         console.error(
-          'JWT_SECRET is not available in hooks.server.js. Ensure it is set in .env and accessible via $env/static/private.'
+          'CRITICAL: JWT_SECRET is not available. This application cannot function securely without it.'
         );
-        // Depending on policy, might want to clear cookie or just proceed without auth
+        // Throw a 500 error to prevent further request processing and inform the user.
+        throw error(500, 'Server configuration error: JWT_SECRET is missing. Please set this environment variable in your deployment environment.');
       } else {
         const decoded = jwt.verify(token, JWT_SECRET);
         if (typeof decoded === 'object' && decoded !== null && 'id' in decoded) {
