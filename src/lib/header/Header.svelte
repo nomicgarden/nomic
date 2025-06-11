@@ -14,19 +14,18 @@
   </div>
 
   <nav class="main-nav">
-    <!-- Standard navigation links can go here if any -->
-    <!-- Example:
-    <svg viewBox="0 0 2 3" aria-hidden="true">
-      <path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
-    </svg>
     <ul>
-      <li class:active={$page.url.pathname === '/'}><a sveltekit:prefetch href="/">Home</a></li>
-      <li class:active={$page.url.pathname === '/treasury'}><a sveltekit:prefetch href="/treasury">Treasury</a></li>
+      <!-- <li class:active={$page.url.pathname === '/'}><a sveltekit:prefetch href="/">Home</a></li> -->
+      <!-- <li class:active={$page.url.pathname === '/treasury'}><a sveltekit:prefetch href="/treasury">Treasury</a></li> -->
+      <li class:active={$page.url.pathname === '/proposals' || $page.url.pathname.startsWith('/proposals/')} data-testid="proposals-link">
+        <a sveltekit:prefetch href="/proposals">Proposals</a>
+      </li>
+      {#if $page.data.user}
+      <li class:active={$page.url.pathname === '/proposals/new'} data-testid="create-proposal-link">
+        <a sveltekit:prefetch href="/proposals/new">Create Proposal</a>
+      </li>
+      {/if}
     </ul>
-    <svg viewBox="0 0 2 3" aria-hidden="true">
-      <path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />
-    </svg>
-    -->
   </nav>
 
   <div class="corner auth-links">

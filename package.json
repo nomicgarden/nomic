@@ -9,7 +9,11 @@
     "check": "svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-check --tsconfig ./jsconfig.json --watch",
     "lint": "prettier --check --plugin-search-dir=. .",
-    "format": "prettier --write --plugin-search-dir=. ."
+    "format": "prettier --write --plugin-search-dir=. .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:db:proposals": "node proposal_database_tests.js"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "1.0.0-next.50",
@@ -17,12 +21,17 @@
     "@types/bcrypt": "^5.0.2",
     "@types/cookie": "^0.4.1",
     "@types/jsonwebtoken": "^9.0.6",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/svelte": "^5.1.0",
+    "@vitest/ui": "^1.4.0",
     "better-sqlite3": "^9.4.3",
     "prettier": "^2.5.1",
     "prettier-plugin-svelte": "^2.5.0",
     "svelte": "^3.46.0",
     "svelte-check": "^2.2.6",
-    "typescript": "~4.6.2"
+    "svelte-jester": "^2.3.2",
+    "typescript": "~4.6.2",
+    "vitest": "^1.4.0"
   },
   "type": "module",
   "dependencies": {
