@@ -20,3 +20,5 @@ export const drinkNames = derived(apiData, ($apiData) => {
   }
   return [];
 });
+
+export const isUserActive = writable(false); // New store

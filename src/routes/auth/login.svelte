@@ -1,236 +1,311 @@
-<script context="module">
-  import { findUserByEmail } from '$lib/server/database';
-  import { generateToken } from '$lib/server/auth';
-  import bcrypt from 'bcrypt';
-  import { fail, redirect } from '@sveltejs/kit';
-  import { enhance } from '$app/forms'; // For progressive enhancement
-  import { page } from '$app/stores'; // To access form action data
-
-  /** @type {import('./$types').Actions} */
-  export const actions = {
-    default: async (event) => {
-      const { request, cookies } = event;
-      const data = await request.formData();
-      const email = data.get('email')?.toString();
-      const password = data.get('password')?.toString();
-
-      // --- Basic Validation ---
-      if (!email || !password) {
-        return fail(400, {
-          error: 'Email and password are required.',
-          values: { email }
-        });
-      }
-
-      // --- User Retrieval ---
-      try {
-        const user = await findUserByEmail(email);
-
-        if (!user) {
-          return fail(401, {
-            error: 'Invalid credentials. Please check your email and password.',
-            values: { email }
-          });
-        }
-
-        // --- Password Verification ---
-        const passwordMatch = await bcrypt.compare(password, user.password_hash);
-
-        if (!passwordMatch) {
-          return fail(401, {
-            error: 'Invalid credentials. Please check your email and password.',
-            values: { email }
-          });
-        }
-
-        // --- Successful Login ---
-        const tokenUser = { id: user.id, username: user.username, email: user.email };
-        const token = generateToken(tokenUser);
-
-        cookies.set('session', token, {
-          path: '/',
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production', // Use true in production
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7 // 7 days
-        });
-
-        // Redirect to home page or a profile page
-        throw redirect(303, '/');
-
-      } catch (e) {
-        console.error('Login error:', e);
-        return fail(500, {
-          error: 'An internal server error occurred during login.',
-          values: { email } // Pass back email
-        });
-      }
-    }
-  };
-</script>
-
 <script>
-  export let form; // Action data from the server
-  let submitting = false; // Local submitting state for the form
-  let email = form?.values?.email || ''; // Initialize email from form data if available
+  import zxcvbn from 'zxcvbn';
+  import * as bip39 from 'bip39'; // Import all as bip39
+  import { isUserActive } from '../store.js'; // Import the store
 
-  // Update local email if form data changes (e.g., after a server error)
+  let username = '';
+  let password = '';
+  let passwordStrength = { score: 0, feedback: { suggestions: [], warning: '' }, guesses_log10: 0 };
+  let isPasswordStrongEnough = false;
+
+  let generatedMnemonic = '';
+  let isGenerating = false;
+  let errorMessage = '';
+
+  const TARGET_GUESSES_LOG10 = 20; // Target for a strong password
+
   $: {
-    email = form?.values?.email || '';
+    if (password) {
+      passwordStrength = zxcvbn(password);
+      isPasswordStrongEnough = passwordStrength.guesses_log10 >= TARGET_GUESSES_LOG10;
+    } else {
+      passwordStrength = { score: 0, feedback: { suggestions: [], warning: '' }, guesses_log10: 0 };
+      isPasswordStrongEnough = false;
+    }
+  }
+
+  $: progressBarColor = () => {
+    if (!password) return 'lightgrey';
+    if (passwordStrength.guesses_log10 < TARGET_GUESSES_LOG10 / 2) return 'var(--strength-weak, #ff4d4d)';
+    if (passwordStrength.guesses_log10 < TARGET_GUESSES_LOG10) return 'var(--strength-moderate, #ffa500)';
+    return 'var(--strength-strong, #4caf50)';
+  };
+
+  $: buttonDisabled = !isPasswordStrongEnough || username.trim() === '' || isGenerating;
+
+  async function handleSubmit() {
+    isGenerating = true;
+    generatedMnemonic = '';
+    errorMessage = '';
+    // $isUserActive = false; // Reset user active state on new attempt, if desired. Or manage elsewhere.
+
+    try {
+      const combinedInput = username + password;
+      const encoder = new TextEncoder();
+      const combinedInputBuffer = encoder.encode(combinedInput);
+      const saltBuffer = encoder.encode(username);
+
+      const importedKey = await window.crypto.subtle.importKey(
+        'raw',
+        combinedInputBuffer,
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits']
+      );
+
+      const derivedBits = await window.crypto.subtle.deriveBits(
+        {
+          name: 'PBKDF2',
+          salt: saltBuffer,
+          iterations: 32768,
+          hash: 'SHA-256'
+        },
+        importedKey,
+        128
+      );
+
+      const entropyBytes = new Uint8Array(derivedBits);
+      let entropyHex = '';
+      for (let i = 0; i < entropyBytes.length; i++) {
+        entropyHex += entropyBytes[i].toString(16).padStart(2, '0');
+      }
+
+      generatedMnemonic = bip39.entropyToMnemonic(entropyHex);
+      if (generatedMnemonic) { // Check if mnemonic was successfully generated
+        $isUserActive = true; // Set user as active
+      }
+
+    } catch (err) {
+      console.error('Mnemonic generation error:', err);
+      if (err instanceof Error) {
+        errorMessage = `Error generating mnemonic: ${err.message}. Please try again.`;
+      } else {
+        errorMessage = 'An unknown error occurred during mnemonic generation. Please try again.';
+      }
+      $isUserActive = false; // Ensure user is not active if there's an error
+    } finally {
+      isGenerating = false;
+    }
+  }
+
+  function clearMnemonicAndDeactivate() {
+    generatedMnemonic = '';
+    $isUserActive = false;
+    errorMessage = ''; // Also clear any errors when user explicitly clears mnemonic
   }
 </script>
 
-<svelte:head>
-  <title>Login</title>
-</svelte:head>
+<h1>Login / Create Account</h1>
 
-<div class="auth-container">
-  <h1>Login to Your Account</h1>
+<form on:submit|preventDefault={handleSubmit}>
+  <div>
+    <label for="username">Username</label>
+    <input type="text" name="username" id="username" bind:value={username} required disabled={isGenerating} />
+  </div>
+  <div>
+    <label for="password">Password</label>
+    <input type="password" name="password" id="password" bind:value={password} required disabled={isGenerating} />
+  </div>
 
-  {#if form?.error && !form?.errors} <!-- Display general error if no specific field errors -->
-    <p class="error-message global-error">{form.error}</p>
-  {/if}
-  {#if form?.success}
-    <p class="success-message global-success">{form.message} {#if form.username}(Welcome back, {form.username}!){/if}</p>
-  {/if}
-
-  <form method="POST" use:enhance={() => {
-    submitting = true; // Set submitting state to true when form submission starts
-    return async ({ update }) => {
-      await update(); // Wait for the server response and page update
-      submitting = false; // Reset submitting state
-    };
-  }}>
-    <div class="form-group">
-      <label for="email">Email</label>
-      <input type="email" id="email" name="email" bind:value={email} required
-             aria-describedby={form?.errors?.email ? "email-error" : undefined} />
-      {#if form?.errors?.email}
-        <p id="email-error" class="error-message field-error">{form.errors.email}</p>
+  {#if password}
+    <div class="strength-meter">
+      <label for="password-strength">Password Strength:</label>
+      <progress id="password-strength" value={passwordStrength.guesses_log10} max={TARGET_GUESSES_LOG10} style="--progress-color: {progressBarColor()};"></progress>
+      <p class="strength-score">Strength indicator: {passwordStrength.guesses_log10.toFixed(2)} / {TARGET_GUESSES_LOG10} (aim for {TARGET_GUESSES_LOG10}+)</p>
+      {#if passwordStrength.feedback.warning}
+        <p class="feedback warning">{passwordStrength.feedback.warning}</p>
+      {/if}
+      {#if passwordStrength.feedback.suggestions && passwordStrength.feedback.suggestions.length > 0}
+        <p class="feedback suggestions-title">Suggestions to improve:</p>
+        <ul class="feedback suggestions">
+          {#each passwordStrength.feedback.suggestions as suggestion}
+            <li>{suggestion}</li>
+          {/each}
+        </ul>
       {/if}
     </div>
+  {/if}
 
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" required
-             aria-describedby={form?.errors?.password ? "password-error" : undefined} />
-      {#if form?.errors?.password}
-        <p id="password-error" class="error-message field-error">{form.errors.password}</p>
-      {/if}
+  <button type="submit" disabled={buttonDisabled}>
+    {#if isGenerating}
+      Generating...
+    {:else}
+      Proceed
+    {/if}
+  </button>
+
+  {#if errorMessage && !generatedMnemonic} <!-- Only show error if no mnemonic is displayed -->
+    <p class="error-message">{errorMessage}</p>
+  {/if}
+</form>
+
+{#if generatedMnemonic}
+  <div class="mnemonic-display">
+    <h2>Your Secure Mnemonic Phrase</h2>
+    <p class="mnemonic-phrase">{generatedMnemonic}</p>
+    <div class="warning-critical">
+      <strong>IMPORTANT:</strong> This is your private key. Write it down, store it securely offline, and then clear it from your screen.
+      Anyone with this phrase can access your account/funds.
     </div>
-
-    <button type="submit" disabled={submitting}>
-      {#if submitting}Logging in...{:else}Login{/if}
-    </button>
-  </form>
-  <p class="auth-link">
-    Don't have an account? <a href="/auth/register">Register here</a>
-  </p>
-</div>
+    <button on:click={clearMnemonicAndDeactivate}>Clear Mnemonic & Deactivate</button>
+  </div>
+{/if}
 
 <style>
-  .auth-container {
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
     max-width: 400px;
     margin: 2rem auto;
-    padding: 2rem;
-    border: 1px solid #e0e0e0;
+    padding: 1.5rem;
+    border: 1px solid #ddd;
     border-radius: 8px;
     background-color: #f9f9f9;
   }
-
-  h1 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #333;
+  div:not(.strength-meter):not(.mnemonic-display):not(.warning-critical) {
+    display: flex;
+    flex-direction: column;
   }
-
-  .form-group {
-    margin-bottom: 1rem;
-  }
-
   label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #555;
+    margin-bottom: 0.35rem;
+    font-weight: bold;
+    font-size: 0.9rem;
   }
-
-  input[type="email"],
-  input[type="password"] {
-    width: 100%;
-    padding: 0.75rem;
+  input {
+    padding: 0.65rem;
     border: 1px solid #ccc;
     border-radius: 4px;
-    box-sizing: border-box;
     font-size: 1rem;
   }
-
-  input:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-  }
-
-  button[type="submit"] {
-    width: 100%;
-    padding: 0.75rem;
+  button {
+    padding: 0.85rem;
     background-color: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
-    font-size: 1rem;
-    font-weight: bold;
     cursor: pointer;
+    font-size: 1rem;
     transition: background-color 0.2s ease;
+    margin-top: 0.5rem;
   }
-
-  button[type="submit"]:hover {
+  button:hover {
     background-color: #0056b3;
   }
-
-  button[type="submit"]:disabled {
-    background-color: #a0cfff;
+  button:disabled {
+    background-color: #cccccc;
     cursor: not-allowed;
   }
 
+  .strength-meter {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    background-color: #fff;
+  }
+  .strength-meter label {
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  progress {
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  progress::-webkit-progress-bar {
+    background-color: #e0e0e0;
+    border-radius: 6px;
+  }
+  progress::-webkit-progress-value {
+    background-color: var(--progress-color, #757575);
+    border-radius: 6px;
+    transition: background-color 0.3s ease-in-out, width 0.3s ease-in-out;
+  }
+  progress::-moz-progress-bar {
+    background-color: var(--progress-color, #757575);
+    border-radius: 6px;
+    transition: background-color 0.3s ease-in-out, width 0.3s ease-in-out;
+  }
+
+  .strength-score {
+    font-size: 0.8rem;
+    color: #333;
+    margin-bottom: 0.5rem;
+    text-align: right;
+  }
+  .feedback {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+  }
+  .feedback.warning {
+    color: #c0392b;
+    font-weight: bold;
+    padding: 0.5rem;
+    background-color: #f9e0de;
+    border-radius: 3px;
+  }
+  .feedback.suggestions-title {
+    font-weight: bold;
+    color: #2980b9;
+    margin-top: 0.75rem;
+  }
+  .feedback.suggestions {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    color: #34495e;
+  }
+  .feedback.suggestions li {
+    margin-bottom: 0.3rem;
+  }
+
   .error-message {
-    color: #d9534f;
-    font-size: 0.875rem;
-  }
-  .field-error {
-     margin-top: 0.25rem;
-     padding: 0.25rem 0.5rem;
-     background-color: #fddede;
-     border-left: 3px solid #d9534f;
-  }
-  .global-error {
+    color: #c0392b;
+    background-color: #f9e0de;
     padding: 0.75rem;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
     border-radius: 4px;
-    margin-bottom: 1rem;
-    text-align: center;
-  }
-  .global-success {
-    padding: 0.75rem;
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+    margin-top: 1rem;
     text-align: center;
   }
 
-  .auth-link {
+  .mnemonic-display {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #007bff;
+    border-radius: 8px;
+    background-color: #e7f3ff;
     text-align: center;
-    margin-top: 1.5rem;
   }
-  .auth-link a {
-    color: #007bff;
-    text-decoration: none;
+  .mnemonic-display h2 {
+    color: #0056b3;
+    margin-bottom: 1rem;
   }
-  .auth-link a:hover {
-    text-decoration: underline;
+  .mnemonic-phrase {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.1rem;
+    color: #333;
+    padding: 1rem;
+    background-color: #fff;
+    border: 1px dashed #007bff;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    word-wrap: break-word;
+  }
+  .warning-critical {
+    padding: 1rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+  .warning-critical strong {
+    display: block;
+    margin-bottom: 0.5rem;
   }
 </style>
