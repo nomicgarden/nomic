@@ -1,9 +1,9 @@
 import { redirect } from '@sveltejs/kit';
 
-/** @type {import('@sveltejs/kit').Load} */
-export async function load({ parent, locals }) {
+/** @type {import('@sveltejs/kit').ServerLoad} */
+export async function load({ locals }) {
   // Access user from locals, which should be populated by hooks.server.js
-  const { user } = locals;
+  const user = locals.user;
 
   if (!user) {
     // User is not authenticated, redirect to login

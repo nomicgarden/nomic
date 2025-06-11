@@ -7,7 +7,7 @@ import {
   getVotesByProposalId
 } from '$lib/server/database.js';
 
-/** @type {import('@sveltejs/kit').Load} */
+/** @type {import('@sveltejs/kit').ServerLoad} */
 export async function load({ params, locals }) {
   const proposalId = params.id;
   const currentUser = locals.user || null;

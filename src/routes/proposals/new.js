@@ -1,7 +1,7 @@
 import { redirect, fail } from '@sveltejs/kit';
 import { createProposal } from '$lib/server/database.js';
 
-/** @type {import('@sveltejs/kit').Load} */
+/** @type {import('@sveltejs/kit').ServerLoad} */
 export async function load({ locals }) {
   if (!locals.user) {
     throw redirect(303, '/auth/login?redirectTo=/proposals/new');

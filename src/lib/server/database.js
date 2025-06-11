@@ -27,6 +27,7 @@ const dbInstance = new Database(dbPath, { verbose: !isTestEnvironment ? console.
 export const db = dbInstance;
 
 // Centralized initDb function, now using the exported db instance
+/** @param {import('better-sqlite3').Database} databaseInstance */
 function initDb(databaseInstance) {
   databaseInstance.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -95,6 +96,11 @@ export function reinitializeDbForTest() {
 }
 
 // User interaction functions
+/**
+ * @param {string} username
+ * @param {string} email
+ * @param {string} passwordHash
+ */
 export function createUser(username, email, passwordHash) {
   try {
     const stmt = db.prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)');
@@ -116,31 +122,66 @@ export function createUser(username, email, passwordHash) {
   }
 }
 
+/**
+ * @param {string} username
+ * @returns {App.User | null}
+ */
 export function findUserByUsername(username) {
   try {
     const stmt = db.prepare(
       'SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE username = ?'
     );
     const user = stmt.get(username);
-    return user || null;
-  } catch (error) {
+    return /** @type {App.User | null} */ (user) || null;
+  } catch (e) {
+    const error = /** @type {Error} */ (e);
     console.error('Error finding user by username:', error.message);
     throw new Error('Database query failed while finding user by username.');
   }
 }
 
+/**
+ * @param {string} email
+ * @returns {App.User | null}
+ */
 export function findUserByEmail(email) {
   try {
     const stmt = db.prepare(
       'SELECT id, username, email, password_hash, profile_picture_url, bio, created_at FROM users WHERE email = ?'
     );
     const user = stmt.get(email);
-    return user || null;
-  } catch (error) {
+    return /** @type {App.User | null} */ (user) || null;
+  } catch (e) {
+    const error = /** @type {Error} */ (e);
     console.error('Error finding user by email:', error.message);
     throw new Error('Database query failed while finding user by email.');
   }
 }
+
+// Define JSDoc types for complex objects for reusability
+/**
+ * @typedef {object} Proposal
+ * @property {number} id
+ * @property {string} title
+ * @property {string} description
+ * @property {number} author_id
+ * @property {string} author_username
+ * @property {string} created_at
+ * @property {string} status
+ * @property {string | null} [proposed_rule_text]
+ * @property {string | null} [manifold_market_url]
+ */
+
+/**
+ * @typedef {object} Vote
+ * @property {number} id
+ * @property {number} proposal_id
+ * @property {number} user_id
+ * @property {string} vote_value
+ * @property {string} voted_at
+ * @property {string | null} rationale
+ * @property {string} [voter_username] // Optional: if joined with users table
+ */
 
 // Placeholder CRUD Functions for Proposals
 
@@ -217,7 +258,7 @@ export function createProposal(data) {
 /**
  * Retrieves a proposal by its ID.
  * @param {number} id - The ID of the proposal to retrieve.
- * @returns {object | null} Placeholder for the proposal object or null if not found.
+ * @returns {Proposal | null} The proposal object or null if not found.
  */
 export function getProposalById(id) {
   try {
@@ -238,8 +279,9 @@ export function getProposalById(id) {
     `);
     // Ensure id is an integer before passing to query
     const proposal = stmt.get(Number(id));
-    return proposal || null;
-  } catch (error) {
+    return /** @type {Proposal | null} */ (proposal) || null;
+  } catch (e) {
+    const error = /** @type {Error} */ (e);
     console.error(`Error fetching proposal by ID (${id}):`, error.message);
     // Depending on how you want to handle DB errors, you might re-throw,
     // or return null/undefined, or a specific error object.
@@ -251,7 +293,7 @@ export function getProposalById(id) {
 /**
  * Retrieves multiple proposals based on options.
  * @param {object} [options={}] - Filtering options (e.g., { status: 'proposed', author_id: 1 }).
- * @returns {Array<object>} Placeholder for an array of proposal objects.
+ * @returns {Array<Proposal>} An array of proposal objects.
  */
 export function getProposals(options = {}) {
   // Basic query structure
@@ -304,8 +346,9 @@ export function getProposals(options = {}) {
   try {
     const stmt = db.prepare(query);
     const proposals = stmt.all(...params); // Use spread for params array
-    return proposals;
-  } catch (error) {
+    return /** @type {Array<Proposal>} */ (proposals);
+  } catch (e) {
+    const error = /** @type {Error} */ (e);
     console.error('Error fetching proposals:', error.message);
     throw new Error('Database query failed while fetching proposals.');
   }
@@ -346,7 +389,8 @@ export function updateProposalStatus(id, status) {
       // This is not an error, but good to be aware of.
     }
     return { changes: info.changes };
-  } catch (error) {
+  } catch (e) {
+    const error = /** @type {Error} */ (e);
     console.error(`Error updating status for proposal ID ${id} to "${status}":`, error.message);
     throw new Error(`Database query failed while updating status for proposal ID ${id}.`);
   }
@@ -405,7 +449,11 @@ export function updateProposalDetails(id, data) {
     ) {
       throw new Error('Title and description cannot be empty.');
     }
-    throw new Error(`Database query failed while updating proposal ID ${id}.`);
+    const err = /** @type {Error & {code?: string}} */ (error); // Cast to allow checking code
+    if (err.code === 'SQLITE_CONSTRAINT_NOTNULL') { // Example of checking specific error codes
+        throw new Error('Title and description cannot be empty if they were part of the update.');
+    }
+    throw new Error(`Database query failed while updating proposal ID ${id}. Original: ${err.message}`);
   }
 }
 

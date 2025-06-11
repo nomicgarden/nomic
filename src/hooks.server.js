@@ -30,9 +30,13 @@ export const handle = async ({ event, resolve }) => {
           event.cookies.delete('session', { path: '/' });
         }
       }
-    } catch (error) {
+    } catch (err) {
       // Common errors: TokenExpiredError, JsonWebTokenError (e.g. invalid signature)
-      console.warn(`Token verification failed: ${error.name} - ${error.message}`);
+      if (err instanceof Error) {
+        console.warn(`Token verification failed: ${err.name} - ${err.message}`);
+      } else {
+        console.warn(`Token verification failed: Unknown error occurred.`);
+      }
       event.locals.user = null;
       // Clear the invalid/expired cookie
       event.cookies.delete('session', { path: '/' });

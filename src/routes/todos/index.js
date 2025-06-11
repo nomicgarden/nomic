@@ -1,70 +1,81 @@
 import { api } from './_api';
+import { json, redirect as kitRedirect } from '@sveltejs/kit';
 
-/** @type {import('./__types').RequestHandler} */
-export const get = async ({ locals }) => {
-  // locals.userid comes from src/hooks.js
-  const response = await api('get', `todos/${locals.userid}`);
+/** @type {import('@sveltejs/kit').RequestHandler} */
+export async function GET({ locals }) {
+  if (!locals.user) {
+    return json({ message: 'Unauthorized' }, { status: 401 });
+  }
+  const response = await api('get', `todos/${locals.user.id}`);
 
   if (response.status === 404) {
-    // user hasn't created a todo list.
-    // start with an empty array
-    return {
-      body: {
-        todos: []
-      }
-    };
+    return json({ todos: [] }); // Return empty list if not found
   }
 
   if (response.status === 200) {
-    return {
-      body: {
-        todos: await response.json()
-      }
-    };
+    return json({ todos: await response.json() });
   }
 
-  return {
-    status: response.status
-  };
-};
+  return new Response(response.body, { status: response.status });
+}
 
-/** @type {import('./index').RequestHandler} */
-export const post = async ({ request, locals }) => {
+/** @type {import('@sveltejs/kit').RequestHandler} */
+export async function POST({ request, locals }) {
+  if (!locals.user) {
+    return json({ message: 'Unauthorized' }, { status: 401 });
+  }
   const form = await request.formData();
+  const text = form.get('text');
 
-  await api('post', `todos/${locals.userid}`, {
-    text: form.get('text')
-  });
+  if (!text) {
+    return json({ message: 'Text is required' }, { status: 400 });
+  }
 
-  return {};
-};
+  await api('post', `todos/${locals.user.id}`, { text });
+
+  return new Response(null, { status: 201 }); // Created
+}
 
 // If the user has JavaScript disabled, the URL will change to
 // include the method override unless we redirect back to /todos
-const redirect = {
-  status: 303,
-  headers: {
-    location: '/todos'
-  }
+// This redirect object needs to be invoked via throw kitRedirect(...)
+const svelteKitRedirectResponse = (location) => {
+  throw kitRedirect(303, location);
 };
 
-/** @type {import('./index').RequestHandler} */
-export const patch = async ({ request, locals }) => {
+/** @type {import('@sveltejs/kit').RequestHandler} */
+export async function PATCH({ request, locals }) {
+  if (!locals.user) {
+    return json({ message: 'Unauthorized' }, { status: 401 });
+  }
   const form = await request.formData();
+  const uid = form.get('uid');
 
-  await api('patch', `todos/${locals.userid}/${form.get('uid')}`, {
+  if (!uid) {
+    return json({ message: 'UID is required' }, { status: 400 });
+  }
+
+  await api('patch', `todos/${locals.user.id}/${uid}`, {
     text: form.has('text') ? form.get('text') : undefined,
     done: form.has('done') ? !!form.get('done') : undefined
   });
 
-  return redirect;
-};
+  return svelteKitRedirectResponse('/todos');
+}
 
-/** @type {import('./index').RequestHandler} */
-export const del = async ({ request, locals }) => {
+/** @type {import('@sveltejs/kit').RequestHandler} */
+export async function DELETE({ request, locals }) {
+  if (!locals.user) {
+    return json({ message: 'Unauthorized' }, { status: 401 });
+  }
   const form = await request.formData();
+  const uid = form.get('uid');
 
-  await api('delete', `todos/${locals.userid}/${form.get('uid')}`);
+  if (!uid) {
+    return json({ message: 'UID is required' }, { status: 400 });
+  }
 
-  return redirect;
-};
+  await api('delete', `todos/${locals.user.id}/${uid}`);
+
+  return svelteKitRedirectResponse('/todos');
+}

@@ -1,7 +1,7 @@
 import { error, redirect, fail } from '@sveltejs/kit';
 import { getProposalById, updateProposalDetails } from '$lib/server/database.js';
 
-/** @type {import('@sveltejs/kit').Load} */
+/** @type {import('@sveltejs/kit').ServerLoad} */
 export async function load({ params, locals }) {
   const proposalId = params.id;
   const user = locals.user;

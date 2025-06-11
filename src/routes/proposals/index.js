@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { getProposals } from '$lib/server/database.js';
 
-/** @type {import('@sveltejs/kit').Load} */
+/** @type {import('@sveltejs/kit').ServerLoad} */
 export async function load({ locals }) {
   try {
     // Fetch all proposals by default.
