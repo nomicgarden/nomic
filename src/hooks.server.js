@@ -10,7 +10,9 @@ export const handle = async ({ event, resolve }) => {
     try {
       // Check if JWT_SECRET is loaded. It should be, but good practice to ensure.
       if (!JWT_SECRET) {
-        console.error('JWT_SECRET is not available in hooks.server.js. Ensure it is set in .env and accessible via $env/static/private.');
+        console.error(
+          'JWT_SECRET is not available in hooks.server.js. Ensure it is set in .env and accessible via $env/static/private.'
+        );
         // Depending on policy, might want to clear cookie or just proceed without auth
       } else {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -28,9 +30,13 @@ export const handle = async ({ event, resolve }) => {
           event.cookies.delete('session', { path: '/' });
         }
       }
-    } catch (error) {
+    } catch (err) {
       // Common errors: TokenExpiredError, JsonWebTokenError (e.g. invalid signature)
-      console.warn(`Token verification failed: ${error.name} - ${error.message}`);
+      if (err instanceof Error) {
+        console.warn(`Token verification failed: ${err.name} - ${err.message}`);
+      } else {
+        console.warn(`Token verification failed: Unknown error occurred.`);
+      }
       event.locals.user = null;
       // Clear the invalid/expired cookie
       event.cookies.delete('session', { path: '/' });
@@ -43,7 +49,6 @@ export const handle = async ({ event, resolve }) => {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   // response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';");
-
 
   // The original cookie logic for 'userid' is no longer needed if 'session' cookie handles authenticated user identity.
   // If 'userid' was for anonymous users, it might still have a place, but typically JWT handles logged-in users.

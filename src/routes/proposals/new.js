@@ -1,7 +1,7 @@
 import { redirect, fail } from '@sveltejs/kit';
 import { createProposal } from '$lib/server/database.js';
 
-/** @type {import('@sveltejs/kit').Load} */
+/** @type {import('@sveltejs/kit').ServerLoad} */
 export async function load({ locals }) {
   if (!locals.user) {
     throw redirect(303, '/auth/login?redirectTo=/proposals/new');
@@ -26,7 +26,6 @@ export const actions = {
     const proposed_rule_text = formData.get('proposed_rule_text')?.toString()?.trim();
     // manifold_market_url is optional, can be added later if needed in the form
     // const manifold_market_url = formData.get('manifold_market_url')?.toString()?.trim();
-
 
     const errors = {};
     if (!title) {

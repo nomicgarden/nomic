@@ -1,20 +1,21 @@
 <script context="module">
-  /** @type {import('@sveltejs/kit').Load} */
-  export async function load({ session, stuff, status, error, page, fetch, host, path, params, url, locals }) {
-    // In older SvelteKit versions, user data from hooks might be directly in `session` or via `locals`.
-    // Given our hooks.server.js setup, `locals.user` is where the user object is.
-    // We need to pass it to the props of the layout and subsequently to $page.data
+  /** @type {import('@sveltejs/kit').LayoutLoad} */
+  export async function load({ locals, data }) {
+    // locals.user is populated by hooks.server.js
+    // data contains props from parent layouts if any (none for root layout)
     return {
-      props: {
-        user: locals.user || null // Ensure user is explicitly null if not authenticated
-      }
+      user: locals.user || null // This will be available in $page.data.user
     };
   }
 </script>
 
 <script>
   import "../app.css";
-  export let user; // This prop is populated by the load function's return value
+
+  /** @type {import('./$types').LayoutData} */
+  export let data; // This 'data' prop receives the return value from the load function
+
+  // $: console.log('Layout data:', data); // For debugging
 </script>
 
 <svelte:head>
@@ -30,8 +31,8 @@
 <slot/>
 
 <!--
-  The $page store will automatically get the 'user' prop from the load function.
-  So, $page.data.user will be available in Header.svelte and other components.
+  The $page store will automatically get the 'user' object from the load function's return value.
+  So, $page.data.user will be available in Header.svelte and other components that need user info.
 -->
 
 <style>

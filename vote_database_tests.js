@@ -23,7 +23,7 @@ async function resetDatabase() {
     DROP TABLE IF EXISTS users;
   `);
   initDb(db); // Pass the actual db instance
-  console.log("Test Database schema re-initialized (Users, Proposals, Votes).");
+  console.log('Test Database schema re-initialized (Users, Proposals, Votes).');
 }
 
 async function setupTestUser(usernameSuffix = '', emailSuffix = '') {
@@ -58,7 +58,6 @@ async function setupTestProposal(authorId, titleSuffix = '') {
   return proposal;
 }
 
-
 // Test Cases
 async function testCreateAndGetUserVote() {
   console.log('Running: testCreateAndGetUserVote');
@@ -74,23 +73,39 @@ async function testCreateAndGetUserVote() {
   };
   const createdVote = createVote(voteData);
   assert(createdVote && createdVote.id, 'createVote should return an object with an id.');
-  assert.strictEqual(createdVote.proposal_id, voteData.proposal_id, 'Created vote proposal_id mismatch.');
+  assert.strictEqual(
+    createdVote.proposal_id,
+    voteData.proposal_id,
+    'Created vote proposal_id mismatch.'
+  );
   assert.strictEqual(createdVote.user_id, voteData.user_id, 'Created vote user_id mismatch.');
-  assert.strictEqual(createdVote.vote_value, voteData.vote_value, 'Created vote vote_value mismatch.');
+  assert.strictEqual(
+    createdVote.vote_value,
+    voteData.vote_value,
+    'Created vote vote_value mismatch.'
+  );
   assert.strictEqual(createdVote.rationale, voteData.rationale, 'Created vote rationale mismatch.');
   assert(createdVote.voted_at, 'Created vote should have a voted_at timestamp.');
 
   const fetchedVote = getUserVoteForProposal(testProposal1.id, testUser1.id);
   assert(fetchedVote, 'getUserVoteForProposal should fetch the created vote.');
   assert.strictEqual(fetchedVote.id, createdVote.id, 'Fetched vote ID mismatch.');
-  assert.strictEqual(fetchedVote.vote_value, voteData.vote_value, 'Fetched vote value mismatch after creation.');
+  assert.strictEqual(
+    fetchedVote.vote_value,
+    voteData.vote_value,
+    'Fetched vote value mismatch after creation.'
+  );
 
   // Test UNIQUE constraint: try to create the same vote again
   try {
     createVote(voteData); // Should throw
     assert.fail('Should have thrown an error for duplicate vote.');
   } catch (error) {
-    assert(error.message.includes('User has already voted on this proposal.') || error.code === 'SQLITE_CONSTRAINT_UNIQUE', `Expected UNIQUE constraint error, but got: ${error.message}`);
+    assert(
+      error.message.includes('User has already voted on this proposal.') ||
+        error.code === 'SQLITE_CONSTRAINT_UNIQUE',
+      `Expected UNIQUE constraint error, but got: ${error.message}`
+    );
     console.log('Caught expected error for duplicate vote.');
   }
   console.log('testCreateAndGetUserVote: PASS');
@@ -102,13 +117,18 @@ async function testUpdateVote() {
   testUser1 = await setupTestUser('UpdateVoteUser');
   testProposal1 = await setupTestProposal(testUser1.id, 'UpdateVoteProp');
 
-  const initialVoteData = { proposal_id: testProposal1.id, user_id: testUser1.id, vote_value: 'yes', rationale: 'Initial thought.' };
+  const initialVoteData = {
+    proposal_id: testProposal1.id,
+    user_id: testUser1.id,
+    vote_value: 'yes',
+    rationale: 'Initial thought.'
+  };
   const createdVote = createVote(initialVoteData);
   assert(createdVote && createdVote.id, 'Failed to create initial vote for update test.');
   const initialVotedAt = createdVote.voted_at;
 
   // Wait a bit to ensure timestamp changes - in a real scenario this might need more robust handling or specific DB time functions
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
   const updatedVoteData = { vote_value: 'no', rationale: 'Changed my mind.' };
   const updateResult = updateVote(createdVote.id, updatedVoteData);
@@ -116,9 +136,21 @@ async function testUpdateVote() {
 
   const fetchedVote = getUserVoteForProposal(testProposal1.id, testUser1.id);
   assert(fetchedVote, 'Failed to fetch vote after update.');
-  assert.strictEqual(fetchedVote.vote_value, updatedVoteData.vote_value, 'Vote value should be updated.');
-  assert.strictEqual(fetchedVote.rationale, updatedVoteData.rationale, 'Vote rationale should be updated.');
-  assert.notStrictEqual(fetchedVote.voted_at, initialVotedAt, 'Vote voted_at timestamp should be updated.');
+  assert.strictEqual(
+    fetchedVote.vote_value,
+    updatedVoteData.vote_value,
+    'Vote value should be updated.'
+  );
+  assert.strictEqual(
+    fetchedVote.rationale,
+    updatedVoteData.rationale,
+    'Vote rationale should be updated.'
+  );
+  assert.notStrictEqual(
+    fetchedVote.voted_at,
+    initialVotedAt,
+    'Vote voted_at timestamp should be updated.'
+  );
   console.log('testUpdateVote: PASS');
 }
 
@@ -129,23 +161,45 @@ async function testGetVotesForProposal() {
   testUser2 = await setupTestUser('MultiVoteUser2');
   testProposal1 = await setupTestProposal(testUser1.id, 'MultiVoteProp');
 
-  createVote({ proposal_id: testProposal1.id, user_id: testUser1.id, vote_value: 'yes', rationale: 'User 1 agrees.' });
-  createVote({ proposal_id: testProposal1.id, user_id: testUser2.id, vote_value: 'no', rationale: 'User 2 disagrees.' });
+  createVote({
+    proposal_id: testProposal1.id,
+    user_id: testUser1.id,
+    vote_value: 'yes',
+    rationale: 'User 1 agrees.'
+  });
+  createVote({
+    proposal_id: testProposal1.id,
+    user_id: testUser2.id,
+    vote_value: 'no',
+    rationale: 'User 2 disagrees.'
+  });
 
   const allVotes = getVotesByProposalId(testProposal1.id);
   assert(Array.isArray(allVotes), 'getVotesByProposalId should return an array.');
-  assert.strictEqual(allVotes.length, 2, 'getVotesByProposalId should return all votes for the proposal.');
+  assert.strictEqual(
+    allVotes.length,
+    2,
+    'getVotesByProposalId should return all votes for the proposal.'
+  );
 
-  const voteUser1 = allVotes.find(v => v.user_id === testUser1.id);
-  const voteUser2 = allVotes.find(v => v.user_id === testUser2.id);
+  const voteUser1 = allVotes.find((v) => v.user_id === testUser1.id);
+  const voteUser2 = allVotes.find((v) => v.user_id === testUser2.id);
 
   assert(voteUser1, 'Vote from testUser1 not found.');
   assert.strictEqual(voteUser1.vote_value, 'yes', 'Vote value for testUser1 mismatch.');
-  assert.strictEqual(voteUser1.voter_username, testUser1.username, 'Voter username for testUser1 mismatch.');
+  assert.strictEqual(
+    voteUser1.voter_username,
+    testUser1.username,
+    'Voter username for testUser1 mismatch.'
+  );
 
   assert(voteUser2, 'Vote from testUser2 not found.');
   assert.strictEqual(voteUser2.vote_value, 'no', 'Vote value for testUser2 mismatch.');
-  assert.strictEqual(voteUser2.voter_username, testUser2.username, 'Voter username for testUser2 mismatch.');
+  assert.strictEqual(
+    voteUser2.voter_username,
+    testUser2.username,
+    'Voter username for testUser2 mismatch.'
+  );
 
   console.log('testGetVotesForProposal: PASS');
 }
