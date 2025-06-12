@@ -23,7 +23,7 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<Header />
+<Header /> {/* Use the Header component */}
 
 <slot/>
 
