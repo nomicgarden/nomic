@@ -23,8 +23,8 @@
 
   <nav class="main-nav">
     <ul>
-      <!-- <li class:active={$page.url.pathname === '/'}><a sveltekit:prefetch href="/">Home</a></li> -->
-      <!-- <li class:active={$page.url.pathname === '/treasury'}><a sveltekit:prefetch href="/treasury">Treasury</a></li> -->
+      <li class:active={$page.url.pathname === '/'}><a sveltekit:prefetch href="/">Home</a></li>
+      <li class:active={$page.url.pathname === '/treasury'}><a sveltekit:prefetch href="/treasury">Treasury</a></li>
       <li class:active={$page.url.pathname === '/proposals' || $page.url.pathname.startsWith('/proposals/')} data-testid="proposals-link">
         <a sveltekit:prefetch href="/proposals">Proposals</a>
       </li>
