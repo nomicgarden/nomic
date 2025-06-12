@@ -11,6 +11,7 @@
 
 <script>
   import "../app.css";
+  import Header from '$lib/header/Header.svelte'; // Import Header
 
   /** @type {import('./$types').LayoutData} */
   export let data; // This 'data' prop receives the return value from the load function
@@ -22,11 +23,7 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<nav>
-  <a href=".">NOMIC</a>
-  <a href="/treasury">TREASURY</a>
-  <!-- Dynamic auth links will be added in Header.svelte -->
-</nav>
+<Header />
 
 <slot/>
 
@@ -36,13 +33,6 @@
 -->
 
 <style>
-  nav {
-    padding: 1rem;
-    box-shadow: -1px 1px 11px 4px #898989;
-  }
-  a {
-    text-decoration: none;
-    color: gray;
-    margin-right: 1rem;
-  }
+  /* Styles for nav and a can be removed if Header.svelte handles all nav styling */
+  /* Keep other styles if they are still relevant */
 </style>

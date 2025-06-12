@@ -28,9 +28,17 @@
       <li class:active={$page.url.pathname === '/proposals' || $page.url.pathname.startsWith('/proposals/')} data-testid="proposals-link">
         <a sveltekit:prefetch href="/proposals">Proposals</a>
       </li>
+      <li class:active={$page.url.pathname === '/proposals' || $page.url.pathname.startsWith('/proposals/')} data-testid="voting-link">
+        <a sveltekit:prefetch href="/proposals">Voting</a>
+      </li>
       {#if $isUserActive}
       <li class:active={$page.url.pathname === '/proposals/new'} data-testid="create-proposal-link">
         <a sveltekit:prefetch href="/proposals/new">Create Proposal</a>
+      </li>
+      {/if}
+      {#if $isUserActive}
+      <li class:active={$page.url.pathname === '/profile/me'} data-testid="profile-link">
+        <a sveltekit:prefetch href="/profile/me">Profile</a>
       </li>
       {/if}
     </ul>
